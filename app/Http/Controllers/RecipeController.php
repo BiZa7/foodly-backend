@@ -8,14 +8,19 @@ use Illuminate\Http\Request;
 class RecipeController extends Controller
 {
     // Lihat semua resep
-    public function index()
+    public function index(Request $request)
     {
-        $recipes = Recipe::with('user')
-            ->withCount('likes')
-            ->latest()
-            ->get();
+    $recipes = Recipe::with('user')
+        ->withCount('likes')
+        ->when($request->search, function ($q) use ($request) {
+            $q->where('title', 'like', '%' . $request->search . '%')
+              ->orWhere('description', 'like', '%' . $request->search . '%')
+              ->orWhere('ingredients', 'like', '%' . $request->search . '%');
+        })
+        ->latest()
+        ->paginate(10);
 
-        return response()->json($recipes);
+    return response()->json($recipes);
     }
 
     // Lihat detail resep

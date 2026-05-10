@@ -27,4 +27,5 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Like
     Route::post('/recipes/{id}/like', [LikeController::class, 'toggle']);
+    Route::get('/user/favorites', [LikeController::class, 'favorites']);
 });

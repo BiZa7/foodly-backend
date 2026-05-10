@@ -10,22 +10,42 @@ class RecipeController extends Controller
     // Lihat semua resep
     public function index(Request $request)
     {
-    $recipes = Recipe::with('user')
-        ->withCount('likes')
-        ->when($request->search, function ($q) use ($request) {
-            $q->where('title', 'like', '%' . $request->search . '%')
-              ->orWhere('description', 'like', '%' . $request->search . '%')
-              ->orWhere('ingredients', 'like', '%' . $request->search . '%');
-        })
-        ->latest()
-        ->paginate(10);
 
-    return response()->json($recipes);
+        $userId = $request->user()?->id;
+
+        $sortColumn = match($request->kategori) {
+            'kalori' => 'calories',
+            'like'   => 'likes_count',
+            default   => 'created_at',
+        };
+
+        $sortDirection = $request->sort === 'ascending' ? 'asc' : 'desc';
+
+        $recipes = Recipe::with('user')
+            ->withCount('likes')
+            ->when($request->search, function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                    ->orWhere('description', 'like', '%' . $request->search . '%')
+                    ->orWhere('ingredients', 'like', '%' . $request->search . '%');
+            })
+            ->orderBy($sortColumn, $sortDirection)
+            ->paginate(10);
+
+        $recipes->getCollection()->transform(function ($recipe) use ($userId) {
+            $recipe->is_liked = $userId
+                ? $recipe->likes()->where('user_id', $userId)->exists()
+                : false;
+            return $recipe;
+        });
+
+        return response()->json($recipes);
     }
 
     // Lihat detail resep
-    public function show($id)
+    public function show(Request $request, int $id)
     {
+
+        $userId = $request->user()?->id;
         $recipe = Recipe::with('user')
             ->withCount('likes')
             ->find($id);
@@ -33,6 +53,9 @@ class RecipeController extends Controller
         if (!$recipe) {
             return response()->json(['message' => 'Resep tidak ditemukan'], 404);
         }
+        $recipe->is_liked = $userId
+            ? $recipe->likes()->where('user_id', $userId)->exists()
+            : false;
 
         return response()->json($recipe);
     }
@@ -66,7 +89,7 @@ class RecipeController extends Controller
     }
 
     // Edit resep
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id)
     {
         $recipe = Recipe::find($id);
 
@@ -89,7 +112,12 @@ class RecipeController extends Controller
         ]);
 
         $recipe->update($request->only([
-            'title', 'description', 'ingredients', 'steps', 'image_url', 'calories'
+            'title',
+            'description',
+            'ingredients',
+            'steps',
+            'image_url',
+            'calories'
         ]));
 
         return response()->json([
@@ -99,7 +127,7 @@ class RecipeController extends Controller
     }
 
     // Hapus resep
-    public function destroy(Request $request, $id)
+    public function destroy(Request $request, int $id)
     {
         $recipe = Recipe::find($id);
 

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 class LikeController extends Controller
 {
     // Toggle like (like jika belum, unlike jika sudah)
-    public function toggle(Request $request, $id)
+    public function toggle(Request $request, int $id)
     {
         $recipe = Recipe::find($id);
 
@@ -27,6 +27,7 @@ class LikeController extends Controller
             return response()->json([
                 'message'     => 'Like dibatalkan',
                 'likes_count' => $recipe->likes()->count(),
+                'is_liked'    => false,  // <-- tambahan
             ]);
         } else {
             // Belum like, maka like
@@ -37,7 +38,28 @@ class LikeController extends Controller
             return response()->json([
                 'message'     => 'Resep berhasil di-like',
                 'likes_count' => $recipe->likes()->count(),
+                'is_liked'    => true,   // <-- tambahan
             ]);
         }
+    }
+
+    // Ambil semua resep yang di-like user yang sedang login
+    public function favorites(Request $request)
+    {
+        $recipes = Recipe::with('user')
+            ->withCount('likes')
+            ->whereHas('likes', function ($q) use ($request) {
+                $q->where('user_id', $request->user()->id);
+            })
+            ->latest()
+            ->paginate(10);
+
+        // Semua resep di sini sudah pasti is_liked = true
+        $recipes->getCollection()->transform(function ($recipe) {
+            $recipe->is_liked = true;
+            return $recipe;
+        });
+
+        return response()->json($recipes);
     }
 }

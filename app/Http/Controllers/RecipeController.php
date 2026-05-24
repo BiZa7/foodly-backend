@@ -117,6 +117,23 @@ class RecipeController extends Controller
         return response()->json(['message' => 'Resep berhasil dihapus']);
     }
 
+    // Resep milik user (My Recipes)
+    public function myRecipes(Request $request)
+    {
+        $recipes = Recipe::with('user')
+            ->where('user_id', $request->user()->id)
+            ->withCount('likes')
+            ->when($request->search, function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                  ->orWhere('description', 'like', '%' . $request->search . '%')
+                  ->orWhere('ingredients', 'like', '%' . $request->search . '%');
+            })
+            ->latest()
+            ->paginate(10);
+
+        return response()->json($recipes);
+    }
+
     // Top 5 resep terbaik dalam 7 hari terakhir
     public function topRecipes()
     {

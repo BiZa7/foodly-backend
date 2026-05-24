@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',      [AuthController::class, 'me']);
 
     // Resep
+    Route::get('/my-recipes',      [RecipeController::class, 'myRecipes']);
     Route::post('/recipes',        [RecipeController::class, 'store']);
     Route::put('/recipes/{id}',    [RecipeController::class, 'update']);
     Route::delete('/recipes/{id}', [RecipeController::class, 'destroy']);

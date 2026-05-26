@@ -10,24 +10,34 @@ class RecipeController extends Controller
     // Lihat semua resep
     public function index(Request $request)
     {
-    $recipes = Recipe::with('user')
-        ->withCount('likes')
-        ->when($request->search, function ($q) use ($request) {
-            $q->where('title', 'like', '%' . $request->search . '%')
-              ->orWhere('description', 'like', '%' . $request->search . '%')
-              ->orWhere('ingredients', 'like', '%' . $request->search . '%');
-        })
-        ->latest()
-        ->paginate(10);
+        $userId = auth('sanctum')->id(); // Ambil ID user jika sedang login, null jika tidak (guest)
 
-    return response()->json($recipes);
+        $recipes = Recipe::with('user')
+            ->withCount('likes')
+            ->withExists(['likes as is_liked' => function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            }])
+            ->when($request->search, function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                    ->orWhere('description', 'like', '%' . $request->search . '%')
+                    ->orWhere('ingredients', 'like', '%' . $request->search . '%');
+            })
+            ->latest()
+            ->paginate(10);
+
+        return response()->json($recipes);
     }
 
     // Lihat detail resep
     public function show($id)
     {
+        $userId = auth('sanctum')->id();
+
         $recipe = Recipe::with('user')
             ->withCount('likes')
+            ->withExists(['likes as is_liked' => function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            }])
             ->find($id);
 
         if (!$recipe) {
@@ -89,7 +99,12 @@ class RecipeController extends Controller
         ]);
 
         $recipe->update($request->only([
-            'title', 'description', 'ingredients', 'steps', 'image_url', 'calories'
+            'title',
+            'description',
+            'ingredients',
+            'steps',
+            'image_url',
+            'calories'
         ]));
 
         return response()->json([
@@ -120,9 +135,14 @@ class RecipeController extends Controller
     // Top 5 resep terbaik dalam 7 hari terakhir
     public function topRecipes()
     {
+        $userId = auth('sanctum')->id();
+
         $recipes = Recipe::with('user')
             ->withCount(['likes' => function ($query) {
                 $query->where('created_at', '>=', now()->subDays(7));
+            }])
+            ->withExists(['likes as is_liked' => function ($q) use ($userId) {
+                $q->where('user_id', $userId);
             }])
             ->orderBy('likes_count', 'desc')
             ->take(5)
@@ -134,17 +154,22 @@ class RecipeController extends Controller
     // Lihat semua resep milik user yang sedang login
     public function myRecipes(Request $request)
     {
-    $recipes = Recipe::with('user')
-        ->withCount('likes')
-        ->where('user_id', $request->user()->id)
-        ->when($request->search, function ($q) use ($request) {
-            $q->where('title', 'like', '%' . $request->search . '%')
-              ->orWhere('description', 'like', '%' . $request->search . '%')
-              ->orWhere('ingredients', 'like', '%' . $request->search . '%');
-        })
-        ->latest()
-        ->paginate(10);
+        $userId = $request->user()->id;
 
-    return response()->json($recipes);
-}
+        $recipes = Recipe::with('user')
+            ->withCount('likes')
+            ->withExists(['likes as is_liked' => function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            }])
+            ->where('user_id', $userId)
+            ->when($request->search, function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                    ->orWhere('description', 'like', '%' . $request->search . '%')
+                    ->orWhere('ingredients', 'like', '%' . $request->search . '%');
+            })
+            ->latest()
+            ->paginate(10);
+
+        return response()->json($recipes);
+    }
 }
